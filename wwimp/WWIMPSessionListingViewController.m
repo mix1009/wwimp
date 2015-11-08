@@ -12,6 +12,8 @@
 
 @interface WWIMPSessionListingViewController ()
 @property (nonatomic) NSIndexPath *focusedIndexPath;
+@property (nonatomic) float playRate;
+@property (nonatomic, retain) AVPlayer *player;
 @end
 
 @implementation WWIMPSessionListingViewController
@@ -19,6 +21,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
 
+    self.playRate = 1.5;
     [self reloadTableViewIfNeeded];
 }
 
@@ -87,8 +90,37 @@
     NSIndexPath *indexPath = [self.tableView indexPathForCell:selectedCell];
     NSDictionary *session = self.sessions[indexPath.row];
     AVPlayerViewController *viewController = [segue destinationViewController];
-    viewController.player = [[AVPlayer alloc] initWithURL:[NSURL URLWithString:session[@"url"]]];
-    [viewController.player play];
+    
+    if (self.player != nil) {
+        [self.player removeObserver:self forKeyPath:@"rate"];
+    }
+    
+    self.player = [[AVPlayer alloc] initWithURL:[NSURL URLWithString:session[@"download_hd"]]];
+    viewController.player = self.player;
+    self.player.currentItem.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithmSpectral;
+    self.player.rate = self.playRate;
+    
+    [self.player addObserver:self forKeyPath:@"rate" options:0 context:0];
+}
+
+- (void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if (context == 0) {
+//        NSLog(@"rate changed to %g (%d)%@%@%@", self.player.rate,
+//              (int)self.player.status,
+//              self.player.currentItem.playbackBufferEmpty? @" empty" : @"",
+//              self.player.currentItem.playbackBufferFull? @" full" : @"",
+//              self.player.currentItem.playbackLikelyToKeepUp? @" keep": @""
+//              );
+//        NSLog(@"changeDict = %@", change);
+        
+        if(self.player.rate==0.0) {
+        } else if(self.player.rate  > 2) {
+            // seeking
+        } else if(self.player.rate!=self.playRate) {
+//            NSLog(@"fix play rate = %g -> %g", self.player.rate, self.playRate);
+            self.player.rate = self.playRate;
+        }
+    }
 }
 
 #pragma mark - UITableViewDataSource
