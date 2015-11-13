@@ -14,10 +14,13 @@
 
 #define MINIMUM_RESUMABLE_PLAYHEAD_POSITION 15
 #define MINIMUM_RESUMABLE_SECONDS_REMAINING 60
+#define DEFAULT_PLAY_RATE                   1.5
 
 @interface WWIMPSessionListingViewController ()
 @property (nonatomic) NSIndexPath *focusedIndexPath;
 @property (nonatomic) BOOL wantsRestart;
+@property (nonatomic) float playRate;
+@property (nonatomic, retain) AVPlayer *player;
 @end
 
 @implementation WWIMPSessionListingViewController
@@ -26,6 +29,7 @@
     [super viewDidLoad];
 
     self.tableView.remembersLastFocusedIndexPath = YES;
+    self.playRate = DEFAULT_PLAY_RATE;
     [self reloadTableViewIfNeeded];
 }
 
@@ -124,7 +128,14 @@
         NSIndexPath *indexPath = [self.tableView indexPathForCell:selectedCell];
         WWIMPSession *session = [self.fetchedResultsController objectAtIndexPath:indexPath];
         AVPlayerViewController *viewController = [segue destinationViewController];
-        viewController.player = [[AVPlayer alloc] initWithURL:[NSURL URLWithString:session.urlString]];
+        
+        if (self.player != nil) {
+            [self.player removeObserver:self forKeyPath:@"rate"];
+        }
+
+        self.player = [[AVPlayer alloc] initWithURL:[NSURL URLWithString:session.urlString]];
+
+        viewController.player = self.player;
         NSString *lastPlayPositionKey = session.lastPlayPositionUserDefaultsKey;
         __weak AVPlayerViewController *weakViewController = viewController;
         [viewController.player addPeriodicTimeObserverForInterval:CMTimeMake(1, 1) queue:dispatch_get_main_queue() usingBlock:^(CMTime time) {
@@ -143,7 +154,24 @@
         if (lastPlayPosition > 0 && !self.wantsRestart) {
             [viewController.player seekToTime:CMTimeMake(lastPlayPosition, 1)];
         }
-        [viewController.player play];
+        
+        self.player.currentItem.audioTimePitchAlgorithm = AVAudioTimePitchAlgorithmSpectral;
+        self.player.rate = self.playRate;
+        
+        [self.player addObserver:self forKeyPath:@"rate" options:0 context:0];
+    }
+}
+
+- (void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    if (context == 0) {
+        if(self.player.rate==0.0) {
+            // paused / stopped
+        } else if(self.player.rate  > 2) {
+            // seeking
+        } else if(self.player.rate!=self.playRate) {
+//            NSLog(@"fix play rate = %g -> %g", self.player.rate, self.playRate);
+            self.player.rate = self.playRate;
+        }
     }
 }
 
